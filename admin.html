@@ -112,6 +112,7 @@ textarea{min-height:90px;resize:vertical}
 <div class="full"><label>الوصف / المكونات</label><textarea id="mEditDesc"></textarea></div>
 <div class="full"><label>الوصف بالعربي (اختياري)</label><textarea id="mEditDescAr" placeholder="لو سبته فاضي، الوصف هيفضل إنجليزي حتى لو اللغة عربي"></textarea></div>
 <div><label>السعر</label><input id="mNewPrice" inputmode="decimal" required></div>
+<div><label>السعرات الحرارية (kcal)</label><input id="mNewCal" inputmode="numeric" placeholder="مثلاً 120"></div>
 <div><label>القسم</label><select id="mCategorySelect"></select></div>
 <div><label>الشارة (Badge)</label><select id="mBadgeSelect">
 <option value="none">بدون شارة (None)</option>
@@ -146,7 +147,7 @@ textarea{min-height:90px;resize:vertical}
 <form id="menuForm" class="hidden">
 <input id="menuId" type="hidden"><input id="menuSourceKey" type="hidden">
 <div class="grid" style="margin-top:14px">
-<div><label>اسم الصنف</label><input id="mName" required></div><div><label>السعر</label><input id="mPrice" required></div>
+<div><label>اسم الصنف</label><input id="mName" required></div><div><label>السعر</label><input id="mPrice" required></div><div><label>السعرات الحرارية (kcal)</label><input id="mCal" inputmode="numeric" placeholder="مثلاً 120"></div>
 <div><label>القسم</label><select id="mCategory" required></select></div><div><label>الوصف</label><input id="mDesc"></div>
 <div><label>الاسم بالعربي (اختياري)</label><input id="mNameAr" placeholder="مثال: كابتشينو"></div>
 <div><label>الوصف بالعربي (اختياري)</label><input id="mDescAr" placeholder="لو سبته فاضي، الوصف هيفضل إنجليزي حتى لو اللغة عربي"></div>
@@ -609,6 +610,7 @@ async function buildMenuIndex(){
    category:(hit?hit.x.category:base.category)||base.category,
    categoryId:(hit?hit.x.categoryId:base.categoryId)||base.categoryId,
    price:hit?hit.x.price:base.price,
+   calories:(hit&&hit.x.calories!==undefined)?hit.x.calories:(base.calories??""),
    description:((hit&&hit.x.description!==undefined)?hit.x.description:base.description)||"",
    image:effectiveMenuImage(hit?hit.x:null,base),
    badge:((hit&&hit.x.badge!==undefined)?hit.x.badge:base.badge)||"none",
@@ -622,7 +624,7 @@ async function buildMenuIndex(){
  });
  extras.forEach(r=>rows.push({
   docId:r.d.id,name:r.x.name,category:r.x.category,categoryId:r.x.categoryId||CATEGORY_CACHE.find(c=>c.name===r.x.category)?.id||"",
-  price:r.x.price,description:r.x.description||"",image:r.x.image||"",badge:r.x.badge||"none",
+  price:r.x.price,calories:r.x.calories??"",description:r.x.description||"",image:r.x.image||"",badge:r.x.badge||"none",
   offerId:r.x.offerId||"",offerName:r.x.offerName||"",
   sourceKey:r.x.sourceKey||"",docData:r.x,isBase:false,baseData:null
  }));
@@ -643,7 +645,7 @@ function renderResults(query){
  matches.forEach(it=>{
   const el=document.createElement("div");el.className="item result";
   const tags=[it.badge&&it.badge!=="none"?`<span class="badge-pill">${it.badge==="best-seller"?"⭐ الأكثر مبيعًا":it.badge==="new"?"جديد":"الأكثر طلبًا"}</span>`:"",it.offerId?`<span class="badge-pill offer">🎁 ${esc(it.offerName||"في عرض")}</span>`:""].filter(Boolean).join(" ");
-  el.innerHTML=`<div class="itemtop"><div><b>${esc(it.name)}</b><div class="meta">${esc(it.category)} · ${esc(it.price)} EGP</div>${tags?`<div style="margin-top:6px">${tags}</div>`:""}</div></div>`;
+  el.innerHTML=`<div class="itemtop"><div><b>${esc(it.name)}</b><div class="meta">${esc(it.category)} · ${esc(it.price)} EGP${it.calories!==""&&it.calories!=null?` · ${esc(it.calories)} kcal`:""}</div>${tags?`<div style="margin-top:6px">${tags}</div>`:""}</div></div>`;
   el.onclick=()=>selectItem(it);
   box.appendChild(el);
  });
@@ -658,6 +660,7 @@ function selectItem(it){
  $("mEditDesc").value=it.description||"";
  $("mEditDescAr").value=it.descriptionAr||"";
  $("mNewPrice").value=it.price??"";
+ $("mNewCal").value=it.calories??"";
  $("mEditImage").value=it.image||"";
  setImagePreview("mEditImagePreview",it.image||"");
  $("mEditImageStatus").textContent="";$("mEditImageStatus").className="meta";
@@ -679,6 +682,7 @@ function clearSelection(){
  $("mEditDesc").value="";
  $("mEditDescAr").value="";
  $("mNewPrice").value="";
+ $("mNewCal").value="";
  $("mEditImage").value="";
  setImagePreview("mEditImagePreview","");
  $("mEditImageStatus").textContent="";$("mEditImageStatus").className="meta";
@@ -708,6 +712,7 @@ $("mSaveAll").onclick=async()=>{
  if(!price){setMsg("mEditorMsg","اكتب السعر",true);return}
  const description=$("mEditDesc").value.trim();
  const descriptionAr=$("mEditDescAr").value.trim();
+ const calories=$("mNewCal").value.replace(/[^\d]/g,"");
  const image=$("mEditImage").value.trim();
  const badge=$("mBadgeSelect").value||"none";
  const selectedCategoryId=$("mCategorySelect").value||it.categoryId||"";
@@ -718,14 +723,14 @@ $("mSaveAll").onclick=async()=>{
  const imageDeleted=!image&&!!bundledImage;
  const payload={
   name,nameAr,category:selectedCategory?.name||it.category,categoryId:selectedCategoryId,
-  price,description,descriptionAr,image,imageDeleted,badge,offerId,offerName,
+  price,calories,description,descriptionAr,image,imageDeleted,badge,offerId,offerName,
   sourceKey:it.sourceKey,deleted:false,
   ...(it.isBase?{originalName:it.baseData.originalName}:{})
  };
  try{
   if(it.docId)await updateDoc(doc(db,"menu",it.docId),payload);
   else{const ref=await addDoc(collection(db,"menu"),payload);it.docId=ref.id}
-  Object.assign(it,{name,nameAr,category:payload.category,categoryId:selectedCategoryId,price,description,descriptionAr,image,imageDeleted,badge,offerId,offerName});
+  Object.assign(it,{name,nameAr,category:payload.category,categoryId:selectedCategoryId,price,calories,description,descriptionAr,image,imageDeleted,badge,offerId,offerName});
   $("mEditorName").textContent=name;
   $("mEditorMeta").textContent=`${payload.category}${it.isBase?" · من المنيو الأصلية":" · مضاف من الإدارة"}`;
   setMsg("mEditorMsg","✓ تم حفظ كل التعديلات بنجاح");
@@ -782,7 +787,7 @@ $("menuForm").onsubmit=async e=>{
     item inside the exact existing category selected, and never creates
     a new one. */
  const addOfferId=$("mAddOfferSelect").value||"";
- const data={name:$("mName").value.trim(),nameAr:$("mNameAr").value.trim(),price:$("mPrice").value.trim(),category:selectedCategory.name,categoryId:selectedCategory.id,description:$("mDesc").value.trim(),descriptionAr:$("mDescAr").value.trim(),image:$("mImage").value.trim(),badge:$("mAddBadge").value||"none",offerId:addOfferId,offerName:addOfferId?(OFFERS_CACHE.find(o=>o.id===addOfferId)?.name||""):""};
+ const data={name:$("mName").value.trim(),nameAr:$("mNameAr").value.trim(),price:$("mPrice").value.trim(),calories:$("mCal").value.replace(/[^\d]/g,""),category:selectedCategory.name,categoryId:selectedCategory.id,description:$("mDesc").value.trim(),descriptionAr:$("mDescAr").value.trim(),image:$("mImage").value.trim(),badge:$("mAddBadge").value||"none",offerId:addOfferId,offerName:addOfferId?(OFFERS_CACHE.find(o=>o.id===addOfferId)?.name||""):""};
  if(!data.name||!data.price){setMsg("mMsg","اكتب اسم الصنف والسعر",true);return}
  try{
   if(id)await updateDoc(doc(db,"menu",id),{...data,sourceKey:stableKey,deleted:false});

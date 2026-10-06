@@ -629,6 +629,13 @@
     return str + " " + tt("menu.currency", "EGP");
   }
 
+  /* Calories label ("120" → "120 kcal" / "120 سعرة"). Empty when unknown. */
+  function calText(cal) {
+    const n = parseInt(String(cal ?? "").replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(n)) return "";
+    return n + " " + tt("menu.kcal", "kcal");
+  }
+
   /* First pictures load immediately (top priority for the first few); the
      rest stay lazy and are pre-fetched in the background (prefetchMenuImages). */
   let _menuImgIndex = 0;
@@ -728,6 +735,7 @@
               data-item-name="${esc(itemL10n.name)}"
               data-item-desc="${esc(noDesc ? "" : (itemL10n.description || ""))}"
               data-item-price="${esc(priceText(item.price))}"
+              data-item-cal="${esc(calText(item.calories))}"
               data-item-category="${esc(catL10n.name)}"
               data-item-icon="${esc(cat.icon)}"
               data-item-image="${esc(item.image || "")}">
@@ -740,12 +748,14 @@
                   <span class="mir-name">${itemL10n.name}</span>
                   ${descText ? `<span class="mir-desc">${descText}</span>` : ""}
                   <span class="mir-price">${priceText(item.price)}</span>
+                  ${calText(item.calories) ? `<span class="mir-cal">${calText(item.calories)}</span>` : ""}
                 </span>
               </span>
               <span class="menu-item-body">
                 <span class="menu-item-name">${itemL10n.name}</span>
                 <span class="menu-item-foot">
                   <span class="menu-item-price">${priceText(item.price)}</span>
+                  ${calText(item.calories) ? `<span class="menu-item-cal">${calText(item.calories)}</span>` : ""}
                 </span>
               </span>
             </button>`;
@@ -798,6 +808,11 @@
     itemModalName.textContent = d.itemName || "";
     itemModalDesc.textContent = d.itemDesc || tt("modal.defaultDesc", "A TYT favorite, made fresh to order.");
     itemModalPrice.textContent = d.itemPrice || "";
+    const itemModalCal = document.getElementById("itemModalCal");
+    if (itemModalCal) {
+      itemModalCal.textContent = d.itemCal || "";
+      itemModalCal.hidden = !d.itemCal;
+    }
     modalFavSource = btn.querySelector(".menu-item-fav");
     syncModalFav();
     lastFocusedEl = btn;
